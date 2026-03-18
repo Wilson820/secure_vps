@@ -1,29 +1,50 @@
 #!/bin/bash
 # secure_ssh.sh - Cambiar puerto SSH y endurecer acceso
 
-echo "--- WARNING ---"
-echo "Nota importante: Antes de ejecutarlo, asegúrate de tener un usuario creado con permisos de sudo. No cierres tu sesión actual hasta que confirmes que puedes entrar por el nuevo puerto"
-
+# 1. Definir variables
 NUEVO_PUERTO=2287  # Puedes cambiar este número (rango 1024-65535)
-USUARIO=$(whoami)
+USUARIO="admin"    # Nombre del usuario que tendrá permisos root (sudo)
+
+# 2. Crear el usuario y dar permisos root si no existe
+if ! id "$USUARIO" &>/dev/null; then
+    echo "--- Creando usuario: $USUARIO ---"
+    sudo adduser --gecos "" "$USUARIO"
+    
+    # Intentar añadir a grupo sudo (Debian/Ubuntu) o wheel (CentOS/Arch)
+    if grep -q "^sudo:" /etc/group; then
+        sudo usermod -aG sudo "$USUARIO"
+    elif grep -q "^wheel:" /etc/group; then
+        sudo usermod -aG wheel "$USUARIO"
+    fi
+    echo "Usuario $USUARIO creado y añadido al grupo de superusuario."
+else
+    echo "--- El usuario $USUARIO ya existe. Verificando permisos ---"
+    if grep -q "^sudo:" /etc/group; then
+        sudo usermod -aG sudo "$USUARIO"
+    elif grep -q "^wheel:" /etc/group; then
+        sudo usermod -aG wheel "$USUARIO"
+    fi
+fi
+
+# 3. Configuración de SSH
 
 echo "--- Configurando SSH en puerto $NUEVO_PUERTO ---"
 
-# 1. Hacer backup de la configuración original
+# Hacer backup de la configuración original
 sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
-# 2. Modificar el puerto y deshabilitar login de root por contraseña
+# Modificar el puerto y deshabilitar login de root por contraseña
 sudo sed -i "s/#Port 22/Port $NUEVO_PUERTO/" /etc/ssh/sshd_config
 sudo sed -i "s/Port 22/Port $NUEVO_PUERTO/" /etc/ssh/sshd_config
 sudo sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin no/" /etc/ssh/sshd_config
 sudo sed -i "s/PermitRootLogin yes/PermitRootLogin no/" /etc/ssh/sshd_config
 
-# 3. Actualizar Firewall UFW
+# 4. Actualizar Firewall UFW
 echo "--- Actualizando Firewall ---"
 sudo ufw allow $NUEVO_PUERTO/tcp
 sudo ufw delete allow 22/tcp
 
-# 4. Reiniciar servicio
+# 5. Reiniciar servicio
 sudo systemctl restart ssh
 
 echo "--------------------------------------------------------"
