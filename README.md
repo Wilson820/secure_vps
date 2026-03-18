@@ -3,17 +3,17 @@ VPS initial config and install secure. - docker environment
 
 ### 1. Ejecute install.sh
 ```
-chmod +x install.sh & ./install.sh
+chmod +x install.sh && ./install.sh
 ```
 
 ### 2. Ejecute setup_npm.sh
 ```
-chmod +x setup_npm.sh & ./setup_npm.sh
+chmod +x setup_npm.sh && ./setup_npm.sh
 ```
 
 ### 3. Ejecute secure_ssh.sh
 ```
-chmod +x secure_ssh.sh & ./secure_ssh.sh
+chmod +x secure_ssh.sh && ./secure_ssh.sh
 ```
 
 # Arquitectura de Conexión Segura
