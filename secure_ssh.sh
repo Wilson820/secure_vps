@@ -32,12 +32,13 @@ echo "--- Configurando SSH en puerto $NUEVO_PUERTO ---"
 # Hacer backup de la configuración original
 sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
-# Modificar el puerto de forma robusta (elimina líneas viejas y asegura una nueva)
+# Limpiar CUALQUIER configuración previa de Port y PermitRootLogin
+# Esto elimina líneas como "Port 22", "#Port 22", "Port 2222", etc.
 sudo sed -i "/^[# ]*Port /d" /etc/ssh/sshd_config
-echo "Port $NUEVO_PUERTO" | sudo tee -a /etc/ssh/sshd_config > /dev/null
-
-# Deshabilitar login de root por contraseña de forma segura
 sudo sed -i "/^[# ]*PermitRootLogin /d" /etc/ssh/sshd_config
+
+# Añadir la nueva configuración limpia
+echo "Port $NUEVO_PUERTO" | sudo tee -a /etc/ssh/sshd_config > /dev/null
 echo "PermitRootLogin no" | sudo tee -a /etc/ssh/sshd_config > /dev/null
 
 # 4. Actualizar Firewall UFW
@@ -46,21 +47,27 @@ sudo ufw allow $NUEVO_PUERTO/tcp
 sudo ufw delete allow 22/tcp 2>/dev/null
 
 # 5. Manejo de Sockets y Reinicio (Crítico para Ubuntu moderno)
-echo "--- Verificando configuración y reiniciando servicio ---"
+echo "--- Asegurando persistencia y reiniciando servicio ---"
 
-# Si existe ssh.socket, hay que desactivarlo para que ssh.service tome el control del puerto
-if systemctl is-active --quiet ssh.socket; then
-    echo "Desactivando ssh.socket para permitir acceso por puerto personalizado..."
+# Si existe ssh.socket, hay que desactivarlo para que ssh.service tome el control
+if systemctl is-active --quiet ssh.socket || systemctl is-enabled --quiet ssh.socket; then
+    echo "Desactivando ssh.socket para dar control total a ssh.service..."
     sudo systemctl stop ssh.socket
     sudo systemctl disable ssh.socket
     sudo systemctl mask ssh.socket
 fi
 
 # Validar sintaxis antes de reiniciar
+echo "Validando sintaxis de configuración..."
+sudo mkdir -p /run/sshd
 if sudo /usr/sbin/sshd -t; then
+    # Habilitar el servicio para que sea PERSISTENTE tras el reboot
+    sudo systemctl enable ssh
     sudo systemctl restart ssh
+    
     echo "--------------------------------------------------------"
     echo "¡SSH configurado exitosamente en el puerto $NUEVO_PUERTO!"
+    echo "EL SERVICIO HA SIDO CONFIGURADO COMO PERSISTENTE (AUTO-START)."
     echo "IMPORTANTE: Prueba tu conexión en una nueva terminal:"
     echo "ssh -p $NUEVO_PUERTO $USUARIO@tu_ip_vps"
     echo "NO CIERRES ESTA SESIÓN HASTA ESTAR SEGURO."
@@ -68,6 +75,7 @@ if sudo /usr/sbin/sshd -t; then
 else
     echo "FATAL: Error en la configuración de SSH. Restaurando backup..."
     sudo cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config
+    sudo systemctl enable ssh
     sudo systemctl restart ssh
     echo "Se ha restaurado la configuración original para evitar pérdida de acceso."
 fi
