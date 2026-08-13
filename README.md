@@ -25,12 +25,12 @@ SSH_PORT=2222 SSH_USER=wilson ./secure_ssh.sh
 
 **Cómo funciona (dos fases, para que sea imposible quedarse fuera):**
 
-1. **Fase 1** — crea el usuario `admin` con sudo, comprueba que tiene una contraseña
+1. **Fase 1** — crea el usuario `admon` con sudo, comprueba que tiene una contraseña
    utilizable y pone a sshd a escuchar en el **22 y en el 2287 a la vez**. El puerto 22
    sigue abierto y root sigue pudiendo entrar: todo es reversible.
 2. El script **se detiene** y le pide que abra otra terminal y verifique:
    ```
-   ssh -p 2287 admin@<IP_DEL_VPS>
+   ssh -p 2287 admon@<IP_DEL_VPS>
    sudo -v
    ```
 3. **Fase 2** — solo si escribe `CONFIRMO`, cierra el puerto 22 y aplica
@@ -69,9 +69,9 @@ sudo systemctl unmask ssh.socket
 sudo systemctl daemon-reload
 sudo systemctl restart ssh
 
-# 4. Si el problema es la cuenta admin, reponga su contraseña
-sudo passwd admin
-sudo passwd -S admin    # el segundo campo debe ser "P"
+# 4. Si el problema es la cuenta admon, reponga su contraseña
+sudo passwd admon
+sudo passwd -S admon    # el segundo campo debe ser "P"
 ```
 
 **Causa habitual del bloqueo:** en Ubuntu ≥20.04, `/etc/ssh/sshd_config` empieza con

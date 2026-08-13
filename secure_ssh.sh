@@ -13,7 +13,7 @@ set -euo pipefail
 
 # 1. Definir variables
 NUEVO_PUERTO="${SSH_PORT:-2287}"   # Puedes cambiar este número (rango 1024-65535)
-USUARIO="${SSH_USER:-admin}"       # Nombre del usuario que tendrá permisos root (sudo)
+USUARIO="${SSH_USER:-admon}"       # Nombre del usuario que tendrá permisos root (sudo)
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
 DROPIN_DIR="/etc/ssh/sshd_config.d"
@@ -140,8 +140,16 @@ fi
 
 if ! id "$USUARIO" &>/dev/null; then
     msg "Creando usuario: $USUARIO"
-    $SUDO adduser --gecos "" "$USUARIO" \
-        || fatal "La creación del usuario $USUARIO falló o se canceló. No se ha modificado SSH."
+    # Si ya existe un grupo con ese nombre (grupo legacy de la distro o resto de un
+    # intento anterior), adduser aborta al intentar crearlo. Se reutiliza con --ingroup.
+    if getent group "$USUARIO" >/dev/null; then
+        echo "El grupo $USUARIO ya existe; se reutilizará como grupo primario."
+        $SUDO adduser --gecos "" --ingroup "$USUARIO" "$USUARIO" \
+            || fatal "La creación del usuario $USUARIO falló o se canceló. No se ha modificado SSH."
+    else
+        $SUDO adduser --gecos "" "$USUARIO" \
+            || fatal "La creación del usuario $USUARIO falló o se canceló. No se ha modificado SSH."
+    fi
 else
     msg "El usuario $USUARIO ya existe. Verificando permisos"
 fi
