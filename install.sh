@@ -16,6 +16,20 @@ sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 81/tcp  # Puerto de administración de Nginx Proxy Manager
-echo "y" | sudo ufw enable
+sudo ufw --force enable
+
+echo "--- Configurando fail2ban ---"
+# Sin jail.local, fail2ban se instala pero no protege nada. secure_ssh.sh
+# actualiza el puerto de aquí automáticamente al cambiar el puerto de SSH.
+sudo tee /etc/fail2ban/jail.local > /dev/null <<'EOF'
+[sshd]
+enabled  = true
+port     = 22
+backend  = systemd
+maxretry = 5
+findtime = 10m
+bantime  = 1h
+EOF
+sudo systemctl enable --now fail2ban
 
 echo "Instalación completada. Reinicia el sistema si es necesario."

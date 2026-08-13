@@ -6,20 +6,79 @@ VPS initial config and install secure. - docker environment
 chmod +x install.sh && ./install.sh
 ```
 
-### 2. Ejecute setup_npm.sh
-```
-chmod +x setup_npm.sh && ./setup_npm.sh
-```
+### 2. Ejecute secure_ssh.sh
+Asegure el acceso **antes** de exponer servicios en el servidor.
 
-### 3. Ejecute secure_ssh.sh
 ```
 chmod +x secure_ssh.sh && ./secure_ssh.sh
 ```
 
-### 4. Ejecute install_insForge.sh
+> **Ejecútelo en una terminal interactiva.** El script crea el usuario y le pide una
+> confirmación a mitad de la ejecución, así que no funciona con `curl | bash` ni con la
+> entrada redirigida.
+
+Puede cambiar el puerto y el usuario sin editar el fichero:
+
 ```
-chmod +x install_insForge.sh && ./install_insForge.sh
+SSH_PORT=2222 SSH_USER=wilson ./secure_ssh.sh
 ```
+
+**Cómo funciona (dos fases, para que sea imposible quedarse fuera):**
+
+1. **Fase 1** — crea el usuario `admin` con sudo, comprueba que tiene una contraseña
+   utilizable y pone a sshd a escuchar en el **22 y en el 2287 a la vez**. El puerto 22
+   sigue abierto y root sigue pudiendo entrar: todo es reversible.
+2. El script **se detiene** y le pide que abra otra terminal y verifique:
+   ```
+   ssh -p 2287 admin@<IP_DEL_VPS>
+   sudo -v
+   ```
+3. **Fase 2** — solo si escribe `CONFIRMO`, cierra el puerto 22 y aplica
+   `PermitRootLogin no`. Cualquier otra respuesta revierte el servidor a su estado original.
+
+Si algo falla en cualquier punto, el script restaura la configuración anterior, reactiva
+`ssh.socket` si lo había desactivado y deja el puerto 22 operativo.
+
+### 3. Ejecute setup_npm.sh
+```
+chmod +x setup_npm.sh && ./setup_npm.sh
+```
+
+### 4. Instale InsForge
+Siga el resumen de la sección de abajo. *(No existe un `install_insForge.sh` en este
+repositorio; la instalación es manual.)*
+
+---
+
+## Si pierdo el acceso al VPS
+
+El script está diseñado para que esto no ocurra, pero si se queda fuera por cualquier otro
+motivo, entre por la **consola web / VNC** del panel de su proveedor y ejecute:
+
+```bash
+# 1. Ver en qué puerto escucha sshd realmente (resuelve los ficheros incluidos)
+sudo sshd -T | grep -E '^(port|permitrootlogin|passwordauthentication) '
+
+# 2. Volver a abrir el puerto 22
+sudo rm -f /etc/ssh/sshd_config.d/00-secure-vps.conf
+sudo cp /etc/ssh/sshd_config.<FECHA>.bak /etc/ssh/sshd_config   # ls /etc/ssh/*.bak
+sudo ufw allow 22/tcp
+
+# 3. Devolver el control a ssh.socket si estaba enmascarado (Ubuntu 24.04)
+sudo systemctl unmask ssh.socket
+sudo systemctl daemon-reload
+sudo systemctl restart ssh
+
+# 4. Si el problema es la cuenta admin, reponga su contraseña
+sudo passwd admin
+sudo passwd -S admin    # el segundo campo debe ser "P"
+```
+
+**Causa habitual del bloqueo:** en Ubuntu ≥20.04, `/etc/ssh/sshd_config` empieza con
+`Include /etc/ssh/sshd_config.d/*.conf` y **gana el primer valor encontrado**, así que un
+`50-cloud-init.conf` puede anular lo que se escriba al final del fichero principal. Por eso
+`secure_ssh.sh` escribe en `00-secure-vps.conf` y verifica el resultado con `sshd -T` en
+lugar de fiarse de `sshd -t`.
 
 ### Resumen de Instalación de InsForge (Vía [Blog Edu Navajas](https://edunavajas.com/blog/insforge-self-host))
 
